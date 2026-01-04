@@ -8,6 +8,7 @@
 
   <div class="d-flex gap-2">
     <a class="btn btn-success" href="/admin/tempat/create">+ Tambah Tempat</a>
+        <a class="btn btn-success" href="/admin/fasilitas">+ Tambah Fasilitas</a>
     <a class="btn btn-outline-dark" href="/admin/report">Laporan</a>
     <form method="POST" action="/admin/logout" class="m-0">@csrf
       <button class="btn btn-warning">Logout</button>

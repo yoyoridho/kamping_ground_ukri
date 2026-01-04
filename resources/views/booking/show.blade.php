@@ -50,8 +50,7 @@
 
   <div class="col-lg-5">
     <div class="card shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title">Pembayaran</h5>
+      <div class="card-body"></a>
         <hr>
 
         @php $st = $tiket->pembayaran->STATUS_BAYAR ?? 'BELUM ADA'; @endphp
@@ -68,14 +67,14 @@
         </div>
 
         @if(!$tiket->pembayaran)
-          <a class="btn btn-success w-100" href="/booking/{{ $tiket->ID_TIKET }}/pay">Buat Pembayaran Dummy</a>
+          <a class="btn btn-success w-100" href="/booking/{{ $tiket->ID_TIKET }}/pay">Buat Pembayaran</a>
         @else
           <a class="btn btn-primary w-100" href="/payment/{{ $tiket->pembayaran->ID_PEMBAYARAN }}/pay">Buka Halaman Bayar</a>
         @endif
 
         @if($st==='LUNAS')
           <div class="alert alert-success mt-3 mb-0">
-            Pembayaran sukses. Tiket dianggap aktif.
+            Pembayaran sukses.
           </div>
         @endif
       </div>

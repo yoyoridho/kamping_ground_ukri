@@ -7,9 +7,13 @@ use App\Http\Controllers\BookingController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\Admin\TempatController;
 use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\BookingFasilitasController;
+use App\Http\Controllers\BookingWizardController;
+use App\Http\Controllers\Admin\FasilitasController as AdminFasilitasController;
 
 // Landing
-Route::get('/', fn() => redirect('/booking'));
+Route::get('/', [DashboardController::class, 'index']);
 
 // Pengunjung auth
 Route::get('/register', [AuthPengunjungController::class, 'showRegister']);
@@ -20,6 +24,13 @@ Route::post('/logout', [AuthPengunjungController::class, 'logout']);
 
 // Booking (pengunjung)
 Route::middleware('auth:pengunjung')->group(function () {
+    Route::get('/booking/wizard', [BookingWizardController::class, 'step1'])->name('booking.wizard.step1');
+    Route::post('/booking/wizard/step1', [BookingWizardController::class, 'postStep1'])->name('booking.wizard.postStep1');
+
+    Route::get('/booking/wizard/fasilitas', [BookingWizardController::class, 'step2'])->name('booking.wizard.step2');
+    Route::post('/booking/wizard/finish', [BookingWizardController::class, 'finish'])->name('booking.wizard.finish');
+    Route::get('/booking/{id}/fasilitas', [BookingFasilitasController::class, 'edit']);
+    Route::post('/booking/{id}/fasilitas', [BookingFasilitasController::class, 'update']);
     Route::get('/booking', [BookingController::class, 'index']);
     Route::get('/booking/create', [BookingController::class, 'create']);
     Route::post('/booking', [BookingController::class, 'store']);
@@ -43,7 +54,12 @@ Route::prefix('admin')->middleware('auth:pegawai')->group(function () {
     Route::post('/tempat', [TempatController::class, 'store']);
     Route::get('/tempat/{id}/edit', [TempatController::class, 'edit']);
     Route::post('/tempat/{id}', [TempatController::class, 'update']);
-
+    Route::get('/fasilitas', [AdminFasilitasController::class, 'index']);
+    Route::get('/fasilitas/create', [AdminFasilitasController::class, 'create']);
+    Route::post('/fasilitas', [AdminFasilitasController::class, 'store']);
+    Route::get('/fasilitas/{id}/edit', [AdminFasilitasController::class, 'edit']);
+    Route::post('/fasilitas/{id}', [AdminFasilitasController::class, 'update']);
+    Route::post('/fasilitas/{id}/delete', [AdminFasilitasController::class, 'destroy']);
     Route::get('/report', [ReportController::class, 'index']);
 });
 

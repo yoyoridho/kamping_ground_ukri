@@ -16,6 +16,13 @@ class Tiket extends Model
         'TANGGAL_MULAI',
         'TANGGAL_SELESAI',
         'JUMLAH_ORANG',
+        'STATUS_PEMBAYARAN',
+        'TOTAL_BAYAR',
+        'QR_TOKEN',
+        'CHECKIN_STATUS',
+        'CHECKIN_AT',
+        'CHECKIN_BY',
+     
     ];
 
     public function pengunjung()

@@ -9,7 +9,6 @@ use App\Models\Tiket;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
-
 class BookingController extends Controller
 {
     // daftar item sewa (dummy master, karena DB belum punya tabel master barang)
@@ -33,13 +32,15 @@ class BookingController extends Controller
         return view('booking.index', compact('bookings'));
     }
 
-    public function create()
-    {
-        $tempatList = HasilTiket::orderBy('NAMA_TEMPAT')->get();
-        $rentalItems = $this->rentalItems;
+public function create(Request $request)
+{
+    $tempatList = HasilTiket::orderBy('NAMA_TEMPAT')->get();
+    $rentalItems = $this->rentalItems;
 
-        return view('booking.create', compact('tempatList', 'rentalItems'));
-    }
+    $selectedTempatId = (int) $request->query('tempat', 0);
+
+    return view('booking.create', compact('tempatList', 'rentalItems', 'selectedTempatId'));
+}
 
     public function store(Request $request)
     {
@@ -110,8 +111,8 @@ class BookingController extends Controller
         }
 
         // Redirect ke detail booking
-        return redirect("/booking/{$tiket->ID_TIKET}")
-            ->with('ok', 'Booking dibuat. Silakan lanjut pembayaran (dummy).');
+        return redirect('/booking/'.$tiket->ID_TIKET.'/fasilitas')->with('ok', 'Booking dibuat. Silakan pilih fasilitas (opsional).');
+
     }
 
     public function show($id)

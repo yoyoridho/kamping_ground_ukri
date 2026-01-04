@@ -36,7 +36,7 @@ class AuthPengunjungController extends Controller
 
         Auth::guard('pengunjung')->login($pengunjung);
 
-        return redirect('/booking')->with('ok', 'Registrasi berhasil!');
+        return redirect()->intended('/booking')->with('ok', 'Registrasi berhasil!');
     }
 
     public function showLogin()
@@ -53,7 +53,7 @@ class AuthPengunjungController extends Controller
 
         if (Auth::guard('pengunjung')->attempt(['GMAIL' => $cred['GMAIL'], 'password' => $cred['PASSWORD']])) {
             $request->session()->regenerate();
-            return redirect('/booking')->with('ok', 'Login berhasil!');
+            return redirect()->intended('/booking')->with('ok', 'Login berhasil!');
         }
 
         return back()->withErrors(['GMAIL' => 'Email / password salah'])->withInput();

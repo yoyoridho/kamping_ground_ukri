@@ -5,7 +5,7 @@
   <div>
     <h4 class="mb-0">Booking Saya</h4>
   </div>
-  <a class="btn btn-success" href="/booking/create">+ Buat Booking</a>
+  <a class="btn btn-success" href="/booking/wizard">+ Buat Booking</a>
 </div>
 
 <div class="card shadow-sm">

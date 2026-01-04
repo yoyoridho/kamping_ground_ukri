@@ -11,7 +11,11 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
   <div class="container">
     <a class="navbar-brand fw-semibold" href="/booking">Camping</a>
-
+<div class="navbar-nav ms-3">
+  <a class="nav-link" href="/">Dashboard</a>
+  <a class="nav-link" href="{{ auth('pengunjung')->check() ? '/booking/wizard' : '/login' }}">Booking</a>
+  <a class="nav-link" href="{{ auth('pengunjung')->check() ? '/booking' : '/login' }}">Booking Saya</a>
+</div>
     <div class="ms-auto d-flex gap-2 align-items-center">
       @auth('pengunjung')
         <span class="text-white-50 small me-2">
@@ -32,7 +36,8 @@
   </div>
 </nav>
 
-<div class="container py-4">
+<div class="container-lg py-4">
+
   @if(session('ok'))
     <div class="alert alert-success">{{ session('ok') }}</div>
   @endif
