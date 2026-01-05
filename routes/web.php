@@ -36,11 +36,17 @@ Route::middleware('auth:pengunjung')->group(function () {
     Route::post('/booking', [BookingController::class, 'store']);
     Route::get('/booking/{id}', [BookingController::class, 'show']);
 
-    // Payment dummy
+    // Payment (Midtrans Snap)
     Route::get('/booking/{id}/pay', [PaymentController::class, 'createForBooking']);
     Route::get('/payment/{id}/pay', [PaymentController::class, 'payPage']);
+    Route::post('/payment/{id}/result', [PaymentController::class, 'storeResult']);
+    // optional: simulasi tanpa midtrans
     Route::post('/payment/{id}/simulate', [PaymentController::class, 'simulate']);
 });
+
+// Webhook Midtrans (tidak pakai auth)
+Route::post('/midtrans/notification', [PaymentController::class, 'notification']);
+
 
 // Admin auth
 Route::get('/admin/login', [AuthPegawaiController::class, 'showLogin'])->name('admin.login');

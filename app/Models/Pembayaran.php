@@ -17,6 +17,11 @@ class Pembayaran extends Model
         'METODE_BAYAR',
         'STATUS_BAYAR',
         'BUKTI_PEMBAYARAN',
+        'MIDTRANS_ORDER_ID',
+        'MIDTRANS_SNAP_TOKEN',
+        'MIDTRANS_TRANSACTION_STATUS',
+        'MIDTRANS_PAYMENT_TYPE',
+        'MIDTRANS_RAW_NOTIFICATION',
     ];
 
     public function tiket()
