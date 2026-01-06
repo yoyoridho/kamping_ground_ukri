@@ -11,6 +11,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BookingFasilitasController;
 use App\Http\Controllers\BookingWizardController;
 use App\Http\Controllers\Admin\FasilitasController as AdminFasilitasController;
+use App\Http\Controllers\Admin\TiketScanController;
 
 // Landing
 Route::get('/', [DashboardController::class, 'index']);
@@ -67,5 +68,7 @@ Route::prefix('admin')->middleware('auth:pegawai')->group(function () {
     Route::post('/fasilitas/{id}', [AdminFasilitasController::class, 'update']);
     Route::post('/fasilitas/{id}/delete', [AdminFasilitasController::class, 'destroy']);
     Route::get('/report', [ReportController::class, 'index']);
+    Route::get('/scan/{token}', [TiketScanController::class, 'show'])->name('admin.scan.show');
+    Route::post('/scan/{token}/checkin', [TiketScanController::class, 'checkin'])->name('admin.scan.checkin');
 });
 

@@ -21,6 +21,15 @@ protected $fillable = [
 
     public function bookings()
     {
-        return $this->hasMany(Tiket::class, 'ID_TEMPAT', 'ID_TEMPAT');
+    return $this->hasMany(Tiket::class, 'ID_TEMPAT', 'ID_TEMPAT');
+    }
+    public function tiket()
+    {
+    return $this->hasMany(\App\Models\Tiket::class, 'ID_TEMPAT', 'ID_TEMPAT');
+    }
+
+    public function addons()
+    {
+    return $this->hasMany(\App\Models\BarangKamping::class, 'ID_TEMPAT', 'ID_TEMPAT');
     }
 }

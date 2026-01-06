@@ -14,11 +14,14 @@
     <div class="card shadow-sm">
       <div class="card-body">
         <h5 class="card-title">Informasi Booking</h5>
+
         @if($tiket->tempat && $tiket->tempat->FOTO_TEMPAT)
-  <img src="{{ asset('storage/'.$tiket->tempat->FOTO_TEMPAT) }}"
-       class="img-fluid rounded mb-3"
-       style="max-height:260px; object-fit:cover; width:100%;">
-@endif
+          <img src="{{ asset('storage/'.$tiket->tempat->FOTO_TEMPAT) }}"
+               class="img-fluid rounded mb-3"
+               style="max-height:260px; object-fit:cover; width:100%;"
+               alt="Foto Tempat">
+        @endif
+
         <hr>
         <div class="mb-2"><b>Tempat:</b> {{ $tiket->tempat->NAMA_TEMPAT ?? '-' }}</div>
         <div class="mb-2"><b>Tanggal:</b> {{ $tiket->TANGGAL_MULAI }} s/d {{ $tiket->TANGGAL_SELESAI }} ({{ $nights }} malam)</div>
@@ -40,7 +43,7 @@
         @else
           <ul class="mb-0">
             @foreach($tiket->addons as $a)
-              <li>{{ $a->NAMA_BARANG }} — Rp{{ $a->HARGA_BARANG }} x {{ $a->QTY ?? 1 }}</li>
+              <li>{{ $a->NAMA_BARANG }} — Rp{{ number_format((float)$a->HARGA_BARANG) }} x {{ $a->QTY ?? 1 }}</li>
             @endforeach
           </ul>
         @endif
@@ -50,10 +53,14 @@
 
   <div class="col-lg-5">
     <div class="card shadow-sm">
-      <div class="card-body"></a>
+      <div class="card-body">
+        <h5 class="card-title">Pembayaran</h5>
         <hr>
 
-        @php $st = $tiket->pembayaran->STATUS_BAYAR ?? 'BELUM ADA'; @endphp
+        @php
+          $st = $tiket->pembayaran->STATUS_BAYAR ?? 'BELUM ADA';
+        @endphp
+
         <div class="mb-2">
           Status:
           <span class="badge
@@ -79,6 +86,47 @@
         @endif
       </div>
     </div>
+
+    {{-- ✅ QR TIKET (muncul hanya jika LUNAS) --}}
+@if($st === 'LUNAS' && !empty($tiket->QR_TOKEN))
+  @php
+    $targetUrl = route('admin.scan.show', ['token' => $tiket->QR_TOKEN]);
+  @endphp
+
+  <div class="card shadow-sm mt-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="card-title mb-1">QR Tiket</h5>
+          <div class="text-muted small">
+            Tunjukkan QR ini ke pegawai untuk discan saat masuk lokasi.
+          </div>
+        </div>
+        <span class="badge bg-success">VALID</span>
+      </div>
+
+      <div class="mt-3 text-center">
+        {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(260)->generate($targetUrl) !!}
+      </div>
+
+      <div class="small text-muted mt-3">
+        *Pegawai harus login dulu untuk membuka halaman verifikasi.
+      </div>
+
+      <div class="mt-2">
+        <a class="btn btn-outline-secondary w-100" target="_blank" href="{{ $targetUrl }}">
+          Buka Link Verifikasi (testing)
+        </a>
+      </div>
+    </div>
+  </div>
+@elseif($st === 'LUNAS' && empty($tiket->QR_TOKEN))
+  <div class="alert alert-warning mt-3">
+    Pembayaran sudah LUNAS, tapi QR_TOKEN belum terbentuk.
+    Pastikan PaymentController generate QR_TOKEN saat status LUNAS.
+  </div>
+@endif
+
   </div>
 </div>
 

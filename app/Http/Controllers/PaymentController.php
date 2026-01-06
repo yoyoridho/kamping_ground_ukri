@@ -13,7 +13,6 @@ class PaymentController extends Controller
 {
     private function initMidtrans(): void
     {
-        // Midtrans PHP SDK config
         \Midtrans\Config::$serverKey = config('midtrans.server_key');
         \Midtrans\Config::$isProduction = (bool) config('midtrans.is_production');
         \Midtrans\Config::$isSanitized = (bool) config('midtrans.is_sanitized');
@@ -22,13 +21,10 @@ class PaymentController extends Controller
 
     private function mapMidtransToStatusBayar(?string $transactionStatus, ?string $fraudStatus = null): string
     {
-        // mapping sederhana (cukup untuk tugas kampus)
-        // referensi status: https://docs.midtrans.com/docs/handle-after-payment
         $ts = strtolower((string) $transactionStatus);
         $fs = strtolower((string) $fraudStatus);
 
         if ($ts === 'capture') {
-            // kartu kredit
             return ($fs === 'challenge') ? 'PENDING' : 'LUNAS';
         }
         if ($ts === 'settlement') return 'LUNAS';
@@ -41,6 +37,31 @@ class PaymentController extends Controller
         return 'PENDING';
     }
 
+    /**
+     * ✅ Tambahan QR:
+     * Pastikan tiket punya QR_TOKEN jika status bayar LUNAS.
+     * Tidak akan overwrite token yang sudah ada.
+     */
+    private function ensureQrTokenForTiket(int $idTiket): void
+    {
+        $tiket = Tiket::find($idTiket);
+        if (!$tiket) return;
+
+        // hanya generate kalau sudah lunas
+        // (pakai STATUS_BAYAR dari pembayaran sebagai sumber kebenaran)
+        if (empty($tiket->QR_TOKEN)) {
+            $tiket->QR_TOKEN = (string) Str::uuid();
+        }
+
+        // inisialisasi check-in field jika ada kolomnya
+        // (aman meskipun kolom belum ada, tapi sebaiknya migrasi sudah dibuat)
+        if (property_exists($tiket, 'CHECKIN_STATUS') || isset($tiket->CHECKIN_STATUS)) {
+            if (empty($tiket->CHECKIN_STATUS)) $tiket->CHECKIN_STATUS = 'BELUM';
+        }
+
+        $tiket->save();
+    }
+
     public function createForBooking($idTiket)
     {
         $user = Auth::guard('pengunjung')->user();
@@ -50,12 +71,10 @@ class PaymentController extends Controller
             ->where('ID_PENGUNJUNG', $user->ID_PENGUNJUNG)
             ->firstOrFail();
 
-        // kalau sudah ada pembayaran, langsung ke halaman pay
         if ($tiket->pembayaran) {
             return redirect("/payment/{$tiket->pembayaran->ID_PEMBAYARAN}/pay");
         }
 
-        // hitung total (sama seperti di BookingController@show)
         $mulai = Carbon::parse($tiket->TANGGAL_MULAI);
         $selesai = Carbon::parse($tiket->TANGGAL_SELESAI);
         $nights = max(1, $mulai->diffInDays($selesai));
@@ -75,7 +94,6 @@ class PaymentController extends Controller
             'STATUS_BAYAR' => 'PENDING',
             'BUKTI_PEMBAYARAN' => null,
 
-            // kolom midtrans (nullable)
             'MIDTRANS_ORDER_ID' => null,
             'MIDTRANS_SNAP_TOKEN' => null,
             'MIDTRANS_TRANSACTION_STATUS' => null,
@@ -94,19 +112,15 @@ class PaymentController extends Controller
             ->where('ID_PEMBAYARAN', $idPembayaran)
             ->firstOrFail();
 
-        // pastikan payment ini milik user
         if ($pay->tiket->ID_PENGUNJUNG != $user->ID_PENGUNJUNG) abort(403);
 
         $snapToken = $pay->MIDTRANS_SNAP_TOKEN;
 
-        // kalau belum ada token dan status masih PENDING, buat token snap
         if (!$snapToken && $pay->STATUS_BAYAR === 'PENDING') {
             $this->initMidtrans();
 
-            // order_id harus unik
             $orderId = $pay->MIDTRANS_ORDER_ID;
             if (!$orderId) {
-                // format: UKRI-<paymentId>-<random>
                 $orderId = 'UKRI-' . $pay->ID_PEMBAYARAN . '-' . Str::upper(Str::random(8));
                 $pay->MIDTRANS_ORDER_ID = $orderId;
             }
@@ -120,7 +134,6 @@ class PaymentController extends Controller
                 $nights = 1;
             }
 
-            // item_details opsional tapi enak buat tampil di Snap
             $items = [];
             if ($pay->tiket->tempat) {
                 $items[] = [
@@ -139,7 +152,6 @@ class PaymentController extends Controller
                 ];
             }
 
-            // customer_details
             $cust = Auth::guard('pengunjung')->user();
             $customerDetails = [
                 'first_name' => (string) ($cust->NAMA_PENGUNJUNG ?? 'Pengunjung'),
@@ -157,7 +169,6 @@ class PaymentController extends Controller
 
             if (!empty($items)) $params['item_details'] = $items;
 
-            // optional: set finish redirect url per transaksi
             $finishUrl = config('midtrans.finish_url');
             if ($finishUrl) {
                 $params['callbacks'] = ['finish' => $finishUrl];
@@ -175,8 +186,6 @@ class PaymentController extends Controller
         return view('payment.pay', compact('pay', 'snapToken', 'clientKey', 'isProduction'));
     }
 
-    // Endpoint dipanggil oleh Snap callback (opsional, biar UI langsung update).
-    // Tetap pakai webhook untuk source of truth.
     public function storeResult(Request $request, $idPembayaran)
     {
         $user = Auth::guard('pengunjung')->user();
@@ -195,7 +204,6 @@ class PaymentController extends Controller
             'raw' => 'nullable',
         ]);
 
-        // simpan apa adanya (jangan jadikan acuan utama)
         if (!empty($data['order_id'])) $pay->MIDTRANS_ORDER_ID = $data['order_id'];
         if (!empty($data['transaction_status'])) $pay->MIDTRANS_TRANSACTION_STATUS = $data['transaction_status'];
         if (!empty($data['payment_type'])) $pay->MIDTRANS_PAYMENT_TYPE = $data['payment_type'];
@@ -213,6 +221,9 @@ class PaymentController extends Controller
                 $tempat->STATUS = 'BOOKED';
                 $tempat->save();
             }
+
+            // ✅ QR: generate token untuk tiket yang lunas
+            $this->ensureQrTokenForTiket((int) $pay->ID_TIKET);
         }
 
         $pay->save();
@@ -220,7 +231,6 @@ class PaymentController extends Controller
         return response()->json(['ok' => true, 'status_bayar' => $pay->STATUS_BAYAR]);
     }
 
-    // Webhook Midtrans (HTTP(S) Notification)
     public function notification(Request $request)
     {
         $this->initMidtrans();
@@ -228,7 +238,6 @@ class PaymentController extends Controller
         try {
             $notif = new \Midtrans\Notification();
         } catch (\Throwable $e) {
-            // kalau gagal parse, tetap return 200 biar tidak retry berlebihan
             return response('invalid', 200);
         }
 
@@ -258,6 +267,9 @@ class PaymentController extends Controller
                 $tiket->tempat->STATUS = 'BOOKED';
                 $tiket->tempat->save();
             }
+
+            // ✅ QR: generate token untuk tiket yang lunas (webhook source of truth)
+            $this->ensureQrTokenForTiket((int) $pay->ID_TIKET);
         }
 
         $pay->save();
@@ -265,7 +277,6 @@ class PaymentController extends Controller
         return response('ok', 200);
     }
 
-    // dipakai kalau kamu mau tetap ada tombol simulasi (tanpa Midtrans)
     public function simulate(Request $request, $idPembayaran)
     {
         $user = Auth::guard('pengunjung')->user();
@@ -284,12 +295,14 @@ class PaymentController extends Controller
             $pay->STATUS_BAYAR = 'LUNAS';
             $pay->TANGGAL_PEMBAYARAN = now()->toDateString();
 
-            // set tempat jadi BOOKED (kalau kamu mau)
             $tempat = $pay->tiket->tempat;
             if ($tempat) {
                 $tempat->STATUS = 'BOOKED';
                 $tempat->save();
             }
+
+            // ✅ QR: generate token untuk tiket lunas dari simulasi
+            $this->ensureQrTokenForTiket((int) $pay->ID_TIKET);
         } elseif ($data['result'] === 'failed') {
             $pay->STATUS_BAYAR = 'GAGAL';
         } else {

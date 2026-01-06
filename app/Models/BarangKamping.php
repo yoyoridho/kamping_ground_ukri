@@ -18,4 +18,19 @@ class BarangKamping extends Model
         'HARGA_BARANG',
         'QTY',
     ];
+
+public function tiket()
+{
+    return $this->belongsTo(\App\Models\Tiket::class, 'ID_TIKET', 'ID_TIKET');
+}
+
+public function pengunjung()
+{
+    return $this->belongsTo(\App\Models\Pengunjung::class, 'ID_PENGUNJUNG', 'ID_PENGUNJUNG');
+}
+
+public function tempat()
+{
+    return $this->belongsTo(\App\Models\HasilTiket::class, 'ID_TEMPAT', 'ID_TEMPAT');
+}
 }
