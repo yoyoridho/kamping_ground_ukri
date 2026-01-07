@@ -35,8 +35,10 @@ class AuthPengunjungController extends Controller
         ]);
 
         Auth::guard('pengunjung')->login($pengunjung);
+        app(\App\Http\Controllers\PengunjungOtpController::class)->sendOtp($pengunjung);
 
-        return redirect()->intended('/booking')->with('ok', 'Registrasi berhasil!');
+        return redirect()->route('verify-otp');
+
     }
 
     public function showLogin()

@@ -110,12 +110,11 @@
       </div>
 
       <div class="small text-muted mt-3">
-        *Pegawai harus login dulu untuk membuka halaman verifikasi.
       </div>
 
       <div class="mt-2">
         <a class="btn btn-outline-secondary w-100" target="_blank" href="{{ $targetUrl }}">
-          Buka Link Verifikasi (testing)
+          Buka Link Verifikasi tiket
         </a>
       </div>
     </div>

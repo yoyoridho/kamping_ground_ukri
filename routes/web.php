@@ -12,6 +12,15 @@ use App\Http\Controllers\BookingFasilitasController;
 use App\Http\Controllers\BookingWizardController;
 use App\Http\Controllers\Admin\FasilitasController as AdminFasilitasController;
 use App\Http\Controllers\Admin\TiketScanController;
+use App\Http\Controllers\OtpController;
+use App\Http\Controllers\PengunjungOtpController;
+
+Route::middleware('auth:pengunjung')->group(function () {
+    Route::get('/verify-otp', [PengunjungOtpController::class, 'showForm'])->name('verify-otp');
+    Route::post('/verify-otp', [PengunjungOtpController::class, 'verify'])->name('verify-otp.submit');
+    Route::post('/resend-otp', [PengunjungOtpController::class, 'resend'])->name('resend-otp');
+});
+
 
 // Landing
 Route::get('/', [DashboardController::class, 'index']);
