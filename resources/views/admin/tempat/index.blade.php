@@ -1,18 +1,17 @@
-@extends('layout')
+@extends('admin.layout')
+@section('title','Dashboard')
 @section('content')
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
   <div>
+    <div class="text-muted">Ringkasan</div>
     <h4 class="mb-0">Data Tempat</h4>
   </div>
 
-  <div class="d-flex gap-2">
-    <a class="btn btn-success" href="/admin/tempat/create">+ Tambah Tempat</a>
-        <a class="btn btn-success" href="/admin/fasilitas">+ Tambah Fasilitas</a>
-    <a class="btn btn-outline-dark" href="/admin/report">Laporan</a>
-    <form method="POST" action="/admin/logout" class="m-0">@csrf
-      <button class="btn btn-warning">Logout</button>
-    </form>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-dark" href="/admin/tempat/create"><i class="bi bi-plus-lg me-2"></i>Tambah Tempat</a>
+    <a class="btn btn-outline-dark" href="/admin/fasilitas"><i class="bi bi-box-seam me-2"></i>Kelola Fasilitas</a>
+    <a class="btn btn-outline-dark" href="/admin/report"><i class="bi bi-bar-chart me-2"></i>Laporan</a>
   </div>
 </div>
 

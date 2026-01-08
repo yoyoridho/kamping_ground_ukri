@@ -80,7 +80,7 @@
         @endif
 
         @if($st !== 'LUNAS')
-          <form action="{{ route('booking.cancel', ['id' => $tiket->ID_TIKET]) }}" method="POST" class="mt-2" data-confirm="Cancel booking ini?">
+          <form action="{{ route('booking.cancel', ['id' => $tiket->ID_TIKET]) }}" method="POST" class="mt-2" onsubmit="return confirm('Cancel booking ini?');">
             @csrf
             <button type="submit" class="btn btn-outline-danger w-100">Cancel Booking</button>
           </form>
@@ -133,33 +133,6 @@
   </div>
 @endif
 
-  </div>
-</div>
-
-
-{{-- Mobile sticky actions --}}
-@php $stMobile = $tiket->pembayaran->STATUS_BAYAR ?? 'BELUM ADA'; @endphp
-<div class="d-md-none" style="height:78px;"></div>
-<div class="d-md-none position-fixed start-0 end-0" style="bottom:0; z-index:1040; background:rgba(255,255,255,.96); backdrop-filter: blur(10px); border-top:1px solid rgba(0,0,0,.08); padding:10px 12px calc(10px + env(safe-area-inset-bottom, 0px));">
-  <div class="d-grid gap-2">
-    @if(!$tiket->pembayaran)
-      <a class="btn btn-success" href="/booking/{{ $tiket->ID_TIKET }}/pay">
-        <i class="bi bi-credit-card me-1"></i> Buat Pembayaran
-      </a>
-    @else
-      <a class="btn btn-primary" href="/payment/{{ $tiket->pembayaran->ID_PEMBAYARAN }}/pay">
-        <i class="bi bi-box-arrow-up-right me-1"></i> Buka Halaman Bayar
-      </a>
-    @endif
-
-    @if($stMobile !== 'LUNAS')
-      <form action="{{ route('booking.cancel', ['id' => $tiket->ID_TIKET]) }}" method="POST" class="m-0" data-confirm="Cancel booking ini?">
-        @csrf
-        <button type="submit" class="btn btn-outline-danger">
-          <i class="bi bi-x-circle me-1"></i> Cancel Booking
-        </button>
-      </form>
-    @endif
   </div>
 </div>
 

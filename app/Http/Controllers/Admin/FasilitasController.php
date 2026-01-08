@@ -10,7 +10,16 @@ class FasilitasController extends Controller
 {
     public function index()
     {
-        $list = Fasilitas::orderByDesc('ID_FASILITAS')->get();
+        $q = trim((string) request('q', ''));
+
+        $list = Fasilitas::query()
+            ->when($q !== '', function ($qq) use ($q) {
+                $qq->where('NAMA_FASILITAS', 'like', "%{$q}%")
+                   ->orWhere('DESKRIPSI', 'like', "%{$q}%");
+            })
+            ->orderByDesc('ID_FASILITAS')
+            ->get();
+
         return view('admin.fasilitas.index', compact('list'));
     }
 
@@ -24,6 +33,7 @@ class FasilitasController extends Controller
         $data = $request->validate([
             'NAMA_FASILITAS' => 'required|string|max:120',
             'HARGA_FASILITAS' => 'required|integer|min:0',
+            'STOK' => 'required|integer|min:0',
             'STATUS' => 'required|in:AKTIF,NONAKTIF',
             'DESKRIPSI' => 'nullable|string|max:255',
         ]);
@@ -46,6 +56,7 @@ class FasilitasController extends Controller
         $data = $request->validate([
             'NAMA_FASILITAS' => 'required|string|max:120',
             'HARGA_FASILITAS' => 'required|integer|min:0',
+            'STOK' => 'required|integer|min:0',
             'STATUS' => 'required|in:AKTIF,NONAKTIF',
             'DESKRIPSI' => 'nullable|string|max:255',
         ]);
@@ -61,5 +72,18 @@ class FasilitasController extends Controller
         $f->delete();
 
         return redirect('/admin/fasilitas')->with('ok', 'Fasilitas berhasil dihapus');
+    }
+
+    public function updateStok(Request $request, $id)
+    {
+        $f = Fasilitas::findOrFail($id);
+
+        $data = $request->validate([
+            'STOK' => 'required|integer|min:0',
+        ]);
+
+        $f->update(['STOK' => (int) $data['STOK']]);
+
+        return redirect('/admin/fasilitas')->with('ok', 'Stok berhasil disimpan');
     }
 }

@@ -14,6 +14,7 @@ class BarangKamping extends Model
         'ID_PENGUNJUNG',
         'ID_TEMPAT',
         'ID_TIKET',
+        'ID_FASILITAS',
         'NAMA_BARANG',
         'HARGA_BARANG',
         'QTY',
@@ -32,5 +33,10 @@ public function pengunjung()
 public function tempat()
 {
     return $this->belongsTo(\App\Models\HasilTiket::class, 'ID_TEMPAT', 'ID_TEMPAT');
+}
+
+public function fasilitas()
+{
+    return $this->belongsTo(\App\Models\Fasilitas::class, 'ID_FASILITAS', 'ID_FASILITAS');
 }
 }

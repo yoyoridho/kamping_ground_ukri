@@ -1,11 +1,11 @@
-@extends('layout')
+@extends('admin.guest')
 @section('content')
 
 <div class="row justify-content-center">
   <div class="col-md-6 col-lg-5">
     <div class="card shadow-sm">
       <div class="card-body p-4">
-        <h4 class="mb-3">Login Admin (Pegawai)</h4>
+        <h4 class="mb-3">Login Admin</h4>
 
         <form method="POST" action="/admin/login">
           @csrf

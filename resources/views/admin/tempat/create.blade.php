@@ -1,4 +1,5 @@
-@extends('layout')
+@extends('admin.layout')
+@section('title','Tambah Tempat')
 @section('content')
 
 <h4 class="mb-3">Tambah Tempat</h4>

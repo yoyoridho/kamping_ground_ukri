@@ -1,4 +1,5 @@
-@extends('layout')
+@extends('admin.layout')
+@section('title','Edit Fasilitas')
 @section('content')
 
 <h4 class="mb-3">Edit Fasilitas</h4>
@@ -15,6 +16,12 @@
     <div class="mb-3">
       <label class="form-label">Harga (per malam)</label>
       <input name="HARGA_FASILITAS" type="number" min="0" class="form-control" value="{{ old('HARGA_FASILITAS', (int)$f->HARGA_FASILITAS) }}" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Stok</label>
+      <input name="STOK" type="number" min="0" class="form-control" value="{{ old('STOK', (int)($f->STOK ?? 0)) }}" required>
+      <div class="form-text">Kalau stok 0, fasilitas tidak muncul di list pemilihan pengunjung.</div>
     </div>
 
     <div class="mb-3">

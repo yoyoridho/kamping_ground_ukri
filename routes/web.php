@@ -15,6 +15,9 @@ use App\Http\Controllers\Admin\TiketScanController;
 use App\Http\Controllers\OtpController;
 use App\Http\Controllers\PengunjungOtpController;
 
+
+// NOTE: route admin fasilitas ada di group admin + auth:pegawai (lihat di bawah)
+
 Route::middleware('auth:pengunjung')->group(function () {
     Route::get('/verify-otp', [PengunjungOtpController::class, 'showForm'])->name('verify-otp');
     Route::post('/verify-otp', [PengunjungOtpController::class, 'verify'])->name('verify-otp.submit');
@@ -45,6 +48,7 @@ Route::middleware('auth:pengunjung')->group(function () {
     Route::get('/booking/create', [BookingController::class, 'create']);
     Route::post('/booking', [BookingController::class, 'store']);
     Route::get('/booking/{id}', [BookingController::class, 'show']);
+    Route::post('/booking/{id}/cancel', [BookingController::class, 'cancel'])->name('booking.cancel');
 
     // Payment (Midtrans Snap)
     Route::get('/booking/{id}/pay', [PaymentController::class, 'createForBooking']);
@@ -65,6 +69,9 @@ Route::post('/admin/logout', [AuthPegawaiController::class, 'logout']);
 
 // Admin pages
 Route::prefix('admin')->middleware('auth:pegawai')->group(function () {
+    Route::get('/', function () {
+        return redirect('/admin/tempat');
+    });
     Route::get('/tempat', [TempatController::class, 'index']);
     Route::get('/tempat/create', [TempatController::class, 'create']);
     Route::post('/tempat', [TempatController::class, 'store']);
@@ -75,6 +82,7 @@ Route::prefix('admin')->middleware('auth:pegawai')->group(function () {
     Route::post('/fasilitas', [AdminFasilitasController::class, 'store']);
     Route::get('/fasilitas/{id}/edit', [AdminFasilitasController::class, 'edit']);
     Route::post('/fasilitas/{id}', [AdminFasilitasController::class, 'update']);
+    Route::post('/fasilitas/{id}/stok', [AdminFasilitasController::class, 'updateStok']);
     Route::post('/fasilitas/{id}/delete', [AdminFasilitasController::class, 'destroy']);
     Route::get('/report', [ReportController::class, 'index']);
     Route::get('/scan/{token}', [TiketScanController::class, 'show'])->name('admin.scan.show');

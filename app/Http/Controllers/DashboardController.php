@@ -5,24 +5,31 @@ namespace App\Http\Controllers;
 use App\Models\HasilTiket;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Fasilitas;
+use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // Tempat yang dipost admin
+        // kalau user sedang memakai filter tempat, paksa tab=tempat
+        if ($request->hasAny(['q','status','sort']) && $request->query('tab') !== 'tempat') {
+        $qs = $request->query();
+        $qs['tab'] = 'tempat';
+        return redirect('/?' . http_build_query($qs));
+    }
+
+
         $tempatList = HasilTiket::orderByDesc('ID_TEMPAT')->get();
 
         $fasilitasList = Fasilitas::where('STATUS', 'AKTIF')
-        ->orderBy('NAMA_FASILITAS')
-        ->get()
-        ->map(fn($x) => ['name' => $x->NAMA_FASILITAS, 'price' => (int)$x->HARGA_FASILITAS])
-        ->toArray();
-
+            ->where('STOK','>',0)
+            ->orderBy('NAMA_FASILITAS')
+            ->get()
+            ->map(fn($x) => ['name' => $x->NAMA_FASILITAS, 'price' => (int)$x->HARGA_FASILITAS])
+            ->toArray();
 
         $isLoggedIn = Auth::guard('pengunjung')->check();
 
-        // Tombol booking: login dulu kalau belum login
         $bookingUrl = '/booking/create';
         $myBookingUrl = '/booking';
 

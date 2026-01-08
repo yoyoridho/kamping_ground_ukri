@@ -9,6 +9,10 @@ class AuthPegawaiController extends Controller
 {
     public function showLogin()
     {
+        // Kalau admin sudah login, jangan tampilkan form login lagi
+        if (Auth::guard('pegawai')->check()) {
+            return redirect('/admin');
+        }
         return view('admin.login');
     }
 
@@ -20,8 +24,10 @@ class AuthPegawaiController extends Controller
         ]);
 
         if (Auth::guard('pegawai')->attempt(['EMAIL_PEGAWAI' => $cred['EMAIL_PEGAWAI'], 'password' => $cred['PASSWORD_PEGAWAI']])) {
+            // Hindari double login (admin + pengunjung dalam 1 browser/session)
+            Auth::guard('pengunjung')->logout();
             $request->session()->regenerate();
-            return redirect('/admin/tempat')->with('ok', 'Login admin berhasil!');
+            return redirect('/admin')->with('ok', 'Login admin berhasil!');
         }
 
         return back()->withErrors(['EMAIL_PEGAWAI' => 'Email / password admin salah'])->withInput();

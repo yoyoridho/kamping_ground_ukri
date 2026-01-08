@@ -4,6 +4,16 @@
 @php
   $isLoggedIn = auth('pengunjung')->check();
 
+  // tab state (tempat|fasilitas)
+ $tab = (string) request()->query('tab', 'tempat');
+if (!in_array($tab, ['tempat','fasilitas'], true)) { $tab = 'tempat'; }
+
+// KUNCI: kalau lagi submit filter tempat, paksa balik ke tab tempat
+if (request()->hasAny(['q','status','sort'])) {
+  $tab = 'tempat';
+}
+
+
   $totalTempat = $tempatList->count();
   $totalTersedia = $tempatList->filter(fn($t) => strtoupper((string)($t->STATUS ?? '')) === 'TERSEDIA')->count();
 
@@ -141,149 +151,178 @@
   </div>
 
   <div class="btn-group" role="group" aria-label="Navigate slider">
-    <button class="btn btn-outline-dark btn-sm" type="button" data-bs-target="#dashboardSlider" data-bs-slide-to="0">
-      Tempat
-    </button>
-    <button class="btn btn-outline-dark btn-sm" type="button" data-bs-target="#dashboardSlider" data-bs-slide-to="1">
-      Fasilitas
-    </button>
+    <a class="btn btn-outline-dark btn-sm {{ $tab==='tempat' ? 'active' : '' }}" href="/?tab=tempat">Tempat</a>
+    <a class="btn btn-outline-dark btn-sm {{ $tab==='fasilitas' ? 'active' : '' }}" href="/?tab=fasilitas">Fasilitas</a>
   </div>
 </div>
 
-{{-- CAROUSEL 2 SLIDE: TEMPAT & FASILITAS --}}
-<div id="dashboardSlider" class="carousel slide" data-bs-ride="false" data-bs-touch="true" data-bs-interval="false">
-  <div class="carousel-inner">
+{{-- CONTENT BY TAB (NO CAROUSEL, NO NYASAR) --}}
+@if($tab === 'tempat')
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
 
-    {{-- SLIDE 1: TEMPAT --}}
-    <div class="carousel-item active">
-      <div class="card shadow-sm mb-4">
-        <div class="card-body">
+      <form class="row g-2 align-items-end" method="GET" action="/">
+        <input type="hidden" name="tab" value="tempat">
 
-          {{-- filter bar tempat --}}
-          <form class="row g-2 align-items-end" method="GET" action="/">
-            <div class="col-md-5">
-              <label class="form-label mb-1">Cari tempat</label>
-              <input name="q" value="{{ $q }}" class="form-control">
-            </div>
-
-            <div class="col-md-3">
-              <label class="form-label mb-1">Status</label>
-              <select name="status" class="form-select">
-                <option value="ALL" @selected($statusFilter==='ALL')>Semua</option>
-                <option value="TERSEDIA" @selected($statusFilter==='TERSEDIA')>Tersedia</option>
-                <option value="BOOKED" @selected($statusFilter==='BOOKED')>Booked</option>
-              </select>
-            </div>
-
-            <div class="col-md-2">
-              <label class="form-label mb-1">Urutkan</label>
-              <select name="sort" class="form-select">
-                <option value="newest" @selected($sort==='newest')>Terbaru</option>
-                <option value="cheapest" @selected($sort==='cheapest')>Termurah</option>
-                <option value="priciest" @selected($sort==='priciest')>Termahal</option>
-                <option value="name" @selected($sort==='name')>Nama A-Z</option>
-              </select>
-            </div>
-
-            <div class="col-md-2 d-flex gap-2">
-              <button class="btn btn-dark w-100">Terapkan</button>
-              <a href="/" class="btn btn-outline-secondary w-100">Reset</a>
-            </div>
-
-            <div class="text-muted small mt-2">
-              Menampilkan <b>{{ $sorted->count() }}</b> dari <b>{{ $totalTempat }}</b> tempat.
-            </div>
-          </form>
-
+        <div class="col-md-5">
+          <label class="form-label mb-1">Cari tempat</label>
+          <input name="q" value="{{ $q }}" class="form-control">
         </div>
-      </div>
 
-      @if($sorted->count() === 0)
-        <div class="alert alert-secondary">Tidak ada tempat yang cocok dengan filter saat ini.</div>
-      @else
-        <div class="row g-3">
-          @foreach($sorted as $t)
-            @php
-              $status = strtoupper((string)($t->STATUS ?? ''));
-              $available = ($status === 'TERSEDIA');
-              $harga = (float)($t->HARGA_PER_MALAM ?? 0);
-            @endphp
+        <div class="col-md-3">
+          <label class="form-label mb-1">Status</label>
+          <select name="status" class="form-select">
+            <option value="ALL" @selected($statusFilter==='ALL')>Semua</option>
+            <option value="TERSEDIA" @selected($statusFilter==='TERSEDIA')>Tersedia</option>
+            <option value="BOOKED" @selected($statusFilter==='BOOKED')>Booked</option>
+          </select>
+        </div>
 
-            <div class="col-sm-6 col-lg-4">
-              <div class="card cg-card h-100 shadow-sm border-0 overflow-hidden">
-                @if(!empty($t->FOTO_TEMPAT))
-                  <a href="#" data-bs-toggle="modal" data-bs-target="#modalTempat{{ $t->ID_TEMPAT }}" class="text-decoration-none">
-                    <img src="{{ asset('storage/'.$t->FOTO_TEMPAT) }}" class="w-100 cg-img" alt="Foto {{ $t->NAMA_TEMPAT }}">
-                  </a>
-                @else
-                  <div class="bg-secondary-subtle d-flex align-items-center justify-content-center cg-img">
-                    <span class="text-muted">Tidak ada foto</span>
-                  </div>
-                @endif
+        <div class="col-md-2">
+          <label class="form-label mb-1">Urutkan</label>
+          <select name="sort" class="form-select">
+            <option value="newest" @selected($sort==='newest')>Terbaru</option>
+            <option value="cheapest" @selected($sort==='cheapest')>Termurah</option>
+            <option value="priciest" @selected($sort==='priciest')>Termahal</option>
+            <option value="name" @selected($sort==='name')>Nama A-Z</option>
+          </select>
+        </div>
 
-                <div class="card-body">
-                  <div class="d-flex justify-content-between align-items-start gap-2">
-                    <div>
-                      <h6 class="mb-1 fw-semibold">{{ $t->NAMA_TEMPAT }}</h6>
-                      <div class="text-muted small">Rp{{ number_format($harga) }} / malam</div>
-                    </div>
+        <div class="col-md-2 d-flex gap-2">
+          <button class="btn btn-dark w-100" type="submit">Terapkan</button>
+          <a href="/?tab=tempat" class="btn btn-outline-secondary w-100">Reset</a>
+        </div>
+
+        <div class="text-muted small mt-2">
+          Menampilkan {{ $sorted->count() }} dari {{ $totalTempat }} tempat.
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  @if($sorted->count() === 0)
+    <div class="alert alert-secondary">Tidak ada tempat yang cocok dengan filter saat ini.</div>
+  @else
+    <div class="row g-3">
+      @foreach($sorted as $t)
+        @php
+          $status = strtoupper((string)($t->STATUS ?? ''));
+          $available = ($status === 'TERSEDIA');
+          $harga = (float)($t->HARGA_PER_MALAM ?? 0);
+        @endphp
+
+        <div class="col-sm-6 col-lg-4">
+          <div class="card cg-card h-100 shadow-sm border-0 overflow-hidden">
+            @if(!empty($t->FOTO_TEMPAT))
+              <a href="#" data-bs-toggle="modal" data-bs-target="#modalTempat{{ $t->ID_TEMPAT }}" class="text-decoration-none">
+                <img src="{{ asset('storage/'.$t->FOTO_TEMPAT) }}" class="w-100 cg-img" alt="Foto {{ $t->NAMA_TEMPAT }}">
+              </a>
+            @else
+              <div class="bg-secondary-subtle d-flex align-items-center justify-content-center cg-img">
+                <span class="text-muted">Tidak ada foto</span>
+              </div>
+            @endif
+
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                  <h6 class="mb-1 fw-semibold">{{ $t->NAMA_TEMPAT }}</h6>
+                  <div class="text-muted small">Rp{{ number_format($harga) }} / malam</div>
+                </div>
+                <span class="badge {{ $available ? 'bg-success' : 'bg-secondary' }} cg-badge-pill">
+                  {{ $t->STATUS }}
+                </span>
+              </div>
+            </div>
+
+            <div class="card-footer bg-white border-0 pt-0 pb-3 px-3">
+              @if($available)
+                <a href="/booking/wizard?tempat={{ $t->ID_TEMPAT }}" class="btn btn-primary w-100">Booking Tempat Ini</a>
+                <div class="text-muted small mt-2">Wizard 2 step: Tempat → Fasilitas → Simpan.</div>
+              @else
+                <button class="btn btn-secondary w-100" disabled>Tidak Tersedia</button>
+              @endif
+            </div>
+          </div>
+        </div>
+
+        @if(!empty($t->FOTO_TEMPAT))
+          <div class="modal fade" id="modalTempat{{ $t->ID_TEMPAT }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title">{{ $t->NAMA_TEMPAT }}</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <img src="{{ asset('storage/'.$t->FOTO_TEMPAT) }}" class="img-fluid rounded" alt="Foto {{ $t->NAMA_TEMPAT }}">
+                  <div class="mt-3 d-flex justify-content-between align-items-center">
+                    <div class="text-muted">Rp{{ number_format($harga) }} / malam</div>
                     <span class="badge {{ $available ? 'bg-success' : 'bg-secondary' }} cg-badge-pill">
                       {{ $t->STATUS }}
                     </span>
                   </div>
                 </div>
-
-                <div class="card-footer bg-white border-0 pt-0 pb-3 px-3">
+                <div class="modal-footer">
                   @if($available)
-                    <a href="/booking/wizard?tempat={{ $t->ID_TEMPAT }}" class="btn btn-primary w-100">
-                      Booking Tempat Ini
-                    </a>
-                    <div class="text-muted small mt-2">
-                      *Wizard 2 step: Tempat → Fasilitas → Simpan.
-                    </div>
-                  @else
-                    <button class="btn btn-secondary w-100" disabled>Tidak Tersedia</button>
+                    <a href="/booking/wizard?tempat={{ $t->ID_TEMPAT }}" class="btn btn-primary">Booking Tempat Ini</a>
                   @endif
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
                 </div>
               </div>
             </div>
-
-            {{-- Modal preview --}}
-            @if(!empty($t->FOTO_TEMPAT))
-              <div class="modal fade" id="modalTempat{{ $t->ID_TEMPAT }}" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered modal-lg">
-                  <div class="modal-content">
-                    <div class="modal-header">
-                      <h5 class="modal-title">{{ $t->NAMA_TEMPAT }}</h5>
-                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                      <img src="{{ asset('storage/'.$t->FOTO_TEMPAT) }}" class="img-fluid rounded" alt="Foto {{ $t->NAMA_TEMPAT }}">
-                      <div class="mt-3 d-flex justify-content-between align-items-center">
-                        <div class="text-muted">Rp{{ number_format($harga) }} / malam</div>
-                        <span class="badge {{ $available ? 'bg-success' : 'bg-secondary' }} cg-badge-pill">
-                          {{ $t->STATUS }}
-                        </span>
-                      </div>
-                    </div>
-                    <div class="modal-footer">
-                      @if($available)
-                        <a href="/booking/wizard?tempat={{ $t->ID_TEMPAT }}" class="btn btn-primary">Booking Tempat Ini</a>
-                      @endif
-                      <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            @endif
-
-          @endforeach
-        </div>
-      @endif
+          </div>
+        @endif
+      @endforeach
     </div>
+  @endif
+
+@else
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-0 cg-section-title">Fasilitas Sewa</h5>
+          <div class="text-muted small">Fasilitas dipilih di Step 2 wizard booking (opsional).</div>
+        </div>
+        <a href="/booking/wizard" class="btn btn-outline-primary btn-sm">Mulai Booking Wizard</a>
+      </div>
+      <hr>
+
+      <div class="table-responsive">
+        <table class="table table-bordered align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Nama Fasilitas</th>
+              <th style="width:220px;">Harga (per malam)</th>
+              <th style="width:220px;">Keterangan</th>
+            </tr>
+          </thead>
+          <tbody>
+            @forelse($fasilitasList as $f)
+              <tr>
+                <td class="fw-semibold">{{ $f['name'] }}</td>
+                <td>Rp{{ number_format((float)$f['price']) }}</td>
+                <td class="text-muted small">Opsional saat booking</td>
+              </tr>
+            @empty
+              <tr>
+                <td colspan="3" class="text-center text-muted py-3">Belum ada data fasilitas.</td>
+              </tr>
+            @endforelse
+          </tbody>
+        </table>
+      </div>
+
+      <div class="text-muted small mt-2">dihitung per malam sesuai jumlah malam booking.</div>
+    </div>
+  </div>
+@endif
+
 
     {{-- SLIDE 2: FASILITAS --}}
-    <div class="carousel-item">
+    <div class="carousel-item {{ $tab === 'fasilitas' ? 'active' : '' }}" data-tab="fasilitas">
       <div class="card shadow-sm">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center">
@@ -340,7 +379,42 @@
   </button>
 </div>
 
-{{-- Bootstrap JS (modal + carousel) --}}
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+{{-- Sinkronkan URL ?tab= dengan posisi carousel (mencegah "Terapkan" lompat ke Fasilitas) --}}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const slider = document.getElementById('dashboardSlider');
+  if (!slider || typeof bootstrap === 'undefined') return;
+
+  const carousel = bootstrap.Carousel.getOrCreateInstance(slider, {
+    interval: false,
+    ride: false,
+    touch: true,
+    wrap: false
+  });
+
+  function syncCarouselWithUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab') || 'tempat';
+    carousel.to(tab === 'fasilitas' ? 1 : 0);
+  }
+
+  // Posisi awal sesuai URL
+  syncCarouselWithUrl();
+
+  // Pastikan submit filter tempat selalu membawa tab=tempat
+  document.querySelectorAll('form[data-tab="tempat"]').forEach(form => {
+    form.addEventListener('submit', () => {
+      let input = form.querySelector('input[name="tab"]');
+      if (!input) {
+        input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'tab';
+        form.appendChild(input);
+      }
+      input.value = 'tempat';
+    });
+  });
+});
+</script>
 
 @endsection

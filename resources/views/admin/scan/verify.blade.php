@@ -1,4 +1,5 @@
-@extends('layout')
+@extends('admin.layout')
+@section('title','Scan Tiket')
 @section('content')
 
 <h4 class="mb-3">Verifikasi Tiket (Scan QR)</h4>

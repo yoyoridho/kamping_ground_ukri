@@ -34,6 +34,8 @@ class AuthPengunjungController extends Controller
             'PASSWORD' => Hash::make($data['PASSWORD']),
         ]);
 
+        // Hindari double login (pengunjung + admin dalam 1 browser/session)
+        Auth::guard('pegawai')->logout();
         Auth::guard('pengunjung')->login($pengunjung);
         app(\App\Http\Controllers\PengunjungOtpController::class)->sendOtp($pengunjung);
 
@@ -54,6 +56,8 @@ class AuthPengunjungController extends Controller
         ]);
 
         if (Auth::guard('pengunjung')->attempt(['GMAIL' => $cred['GMAIL'], 'password' => $cred['PASSWORD']])) {
+            // Hindari double login (pengunjung + admin dalam 1 browser/session)
+            Auth::guard('pegawai')->logout();
             $request->session()->regenerate();
             return redirect()->intended('/booking')->with('ok', 'Login berhasil!');
         }

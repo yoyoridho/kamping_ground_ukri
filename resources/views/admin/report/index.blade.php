@@ -1,4 +1,5 @@
-@extends('layout')
+@extends('admin.layout')
+@section('title','Laporan')
 @section('content')
 
 <h4 class="mb-3">Laporan Pembayaran</h4>

@@ -13,7 +13,9 @@ class Fasilitas extends Model
     protected $fillable = [
         'NAMA_FASILITAS',
         'HARGA_FASILITAS',
+        'STOK',
         'STATUS',
         'DESKRIPSI',
     ];
 }
+

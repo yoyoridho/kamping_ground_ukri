@@ -1,4 +1,5 @@
-@extends('layout')
+@extends('admin.layout')
+@section('title','Tambah Fasilitas')
 @section('content')
 
 <h4 class="mb-3">Tambah Fasilitas</h4>
@@ -15,6 +16,12 @@
     <div class="mb-3">
       <label class="form-label">Harga (per malam)</label>
       <input name="HARGA_FASILITAS" type="number" min="0" class="form-control" value="{{ old('HARGA_FASILITAS', 0) }}" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Stok</label>
+      <input name="STOK" type="number" min="0" class="form-control" value="{{ old('STOK', 0) }}" required>
+      <div class="form-text">Stok akan berkurang otomatis ketika fasilitas disewa.</div>
     </div>
 
     <div class="mb-3">

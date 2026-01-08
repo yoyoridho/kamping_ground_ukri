@@ -13,8 +13,41 @@ class BookingWizardController extends Controller
 {
     private string $sessionKey = 'booking_wizard';
 
+    /**
+     * Cari booking yang masih menggantung (belum LUNAS).
+     */
+    private function blockingBooking(int $idPengunjung): ?Tiket
+    {
+        return Tiket::with('pembayaran')
+            ->where('ID_PENGUNJUNG', $idPengunjung)
+            ->where(function ($q) {
+                $q->whereDoesntHave('pembayaran')
+                    ->orWhereHas('pembayaran', function ($qq) {
+                        $qq->where('STATUS_BAYAR', '!=', 'LUNAS');
+                    });
+            })
+            ->orderByDesc('ID_TIKET')
+            ->first();
+    }
+
     public function step1(Request $request)
     {
+        $user = auth('pengunjung')->user();
+        if ($user) {
+            $blocking = $this->blockingBooking((int) $user->ID_PENGUNJUNG);
+            if ($blocking) {
+                return redirect('/booking/'.$blocking->ID_TIKET)
+                    ->with('ok', 'Kamu masih punya booking yang belum LUNAS. Silakan bayar dulu atau cancel booking tersebut.');
+            }
+        }
+        if ($user) {
+            $blocking = $this->blockingBooking((int) $user->ID_PENGUNJUNG);
+            if ($blocking) {
+                return redirect('/booking/'.$blocking->ID_TIKET)
+                    ->with('ok', 'Kamu masih punya booking yang belum LUNAS. Silakan bayar dulu atau cancel booking tersebut.');
+            }
+        }
+
         $tempatList = HasilTiket::orderByDesc('ID_TEMPAT')->get();
 
         $selectedTempatId = (int) $request->query('tempat', 0);
@@ -30,6 +63,15 @@ class BookingWizardController extends Controller
 
     public function postStep1(Request $request)
     {
+        $user = auth('pengunjung')->user();
+        if ($user) {
+            $blocking = $this->blockingBooking((int) $user->ID_PENGUNJUNG);
+            if ($blocking) {
+                return redirect('/booking/'.$blocking->ID_TIKET)
+                    ->with('ok', 'Kamu masih punya booking yang belum LUNAS. Silakan bayar dulu atau cancel booking tersebut.');
+            }
+        }
+
         $data = $request->validate([
             'ID_TEMPAT' => 'required|integer',
             'TANGGAL_MULAI' => 'required|date',
@@ -54,13 +96,17 @@ class BookingWizardController extends Controller
         $tempat = HasilTiket::find($wizard['ID_TEMPAT']);
 
         $rentalItems = Fasilitas::where('STATUS', 'AKTIF')
+            ->where('STOK', '>', 0)
             ->orderBy('NAMA_FASILITAS')
             ->get()
             ->map(fn($x) => [
-                'name' => $x->NAMA_FASILITAS,
+                'id' => (int) $x->ID_FASILITAS,
+                'name' => (string) $x->NAMA_FASILITAS,
                 'price' => (int) $x->HARGA_FASILITAS,
-            ])
+                'stok' => (int) $x->STOK,
+         ])
             ->toArray();
+
 
         return view('booking.wizard_step2', compact('wizard', 'tempat', 'rentalItems'));
     }
@@ -76,20 +122,22 @@ class BookingWizardController extends Controller
 
         $data = $request->validate([
             'addons' => 'sometimes|array',
-            'addons.*.name' => 'sometimes|string',
-            'addons.*.price' => 'sometimes|numeric|min:0',
-            'addons.*.qty' => 'nullable|integer|min:0',
+            'addons.*' => 'nullable|integer|min:0', // addons[ID] = qty
         ]);
+
 
         $user = auth('pengunjung')->user();
 
-        $activeFacilities = Fasilitas::where('STATUS', 'AKTIF')
-            ->get()
-            ->keyBy('NAMA_FASILITAS');
+        $blocking = $this->blockingBooking((int) $user->ID_PENGUNJUNG);
+        if ($blocking) {
+            return redirect('/booking/'.$blocking->ID_TIKET)
+                ->with('ok', 'Kamu masih punya booking yang belum LUNAS. Silakan bayar dulu atau cancel booking tersebut.');
+        }
 
         $createdTiketId = null;
 
-        DB::transaction(function () use ($user, $wizard, $data, $activeFacilities, &$createdTiketId) {
+        try {
+            DB::transaction(function () use ($user, $wizard, $data, &$createdTiketId) {
 
             $tiket = Tiket::create([
                 'ID_PENGUNJUNG' => $user->ID_PENGUNJUNG,
@@ -102,32 +150,71 @@ class BookingWizardController extends Controller
             $createdTiketId = $tiket->ID_TIKET;
 
             $addons = $data['addons'] ?? [];
+if (!is_array($addons)) $addons = [];
 
-            foreach ($addons as $a) {
-                $qty = (int)($a['qty'] ?? 0);
-                if ($qty <= 0) continue;
+// ambil yang qty > 0
+$picked = [];
+foreach ($addons as $fid => $qty) {
+    $fid = (int) $fid;
+    $qty = (int) $qty;
+    if ($fid > 0 && $qty > 0) {
+        $picked[$fid] = $qty;
+    }
+}
 
-                $name = (string)($a['name'] ?? '');
+if (count($picked) > 0) {
+    // lock fasilitas yang dipilih
+    $facilities = Fasilitas::whereIn('ID_FASILITAS', array_keys($picked))
+        ->where('STATUS', 'AKTIF')
+        ->get()
+        ->keyBy('ID_FASILITAS');
 
-                if (!$activeFacilities->has($name)) {
-                    continue;
-                }
+    // validasi stok cukup
+    foreach ($picked as $fid => $qty) {
+        if (!isset($facilities[$fid])) {
+            // fasilitas tidak ada / tidak aktif
+            throw new \Exception("Fasilitas tidak valid.");
+        }
 
-                $hargaAsli = (int) $activeFacilities[$name]->HARGA_FASILITAS;
+        $f = $facilities[$fid];
+        $stok = (int) $f->STOK;
 
-                BarangKamping::create([
-                    'ID_PENGUNJUNG' => $user->ID_PENGUNJUNG,
-                    'ID_TEMPAT' => $wizard['ID_TEMPAT'],
-                    'ID_TIKET' => $tiket->ID_TIKET,
-                    'NAMA_BARANG' => $name,
-                    'HARGA_BARANG' => (string) $hargaAsli,
-                    'QTY' => $qty,
-                ]);
-            }
+        if ($stok < $qty) {
+            // lempar exception biar transaksi batal
+            throw new \Exception("Stok {$f->NAMA_FASILITAS} tidak cukup. Sisa: {$stok}");
+        }
+    }
 
-            session()->forget('booking_wizard');
-        });
+    // simpan addons (stok akan dipotong saat pembayaran LUNAS)
+    foreach ($picked as $fid => $qty) {
+        $f = $facilities[$fid];
 
-        return redirect('/booking')->with('ok', 'Booking berhasil disimpan! (ID: '.$createdTiketId.')');
+        BarangKamping::create([
+            'ID_PENGUNJUNG' => $user->ID_PENGUNJUNG,
+            'ID_TEMPAT' => $wizard['ID_TEMPAT'],
+            'ID_TIKET' => $tiket->ID_TIKET,
+            'ID_FASILITAS' => $fid,
+
+            // supaya tetap kompatibel sama tabel barang_kamping kamu:
+            'NAMA_BARANG' => (string) $f->NAMA_FASILITAS,
+            'HARGA_BARANG' => (string) ((int) $f->HARGA_FASILITAS),
+            'QTY' => $qty,
+        ]);
+    }
+}
+
+            });
+        } catch (\Throwable $e) {
+            // batal, jangan hapus session wizard supaya user bisa perbaiki qty
+            return back()->withInput()->withErrors([
+                'addons' => $e->getMessage(),
+            ]);
+        }
+
+        // bersihkan session wizard
+        $request->session()->forget($this->sessionKey);
+
+        return redirect('/booking/'.$createdTiketId)
+            ->with('ok', 'Booking selesai! Silakan lakukan pembayaran untuk menyelesaikan booking kamu.');
     }
 }

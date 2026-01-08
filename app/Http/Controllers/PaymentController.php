@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Pembayaran;
 use App\Models\Tiket;
+use App\Models\Fasilitas;
+use App\Models\BarangKamping;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class PaymentController extends Controller
@@ -61,6 +64,106 @@ class PaymentController extends Controller
 
         $tiket->save();
     }
+
+    /**
+     * Potong stok addon (fasilitas) hanya saat pembayaran LUNAS.
+     * Aman dari double-run dengan flag ADDON_STOK_DEDUCTED di tabel tiket.
+     */
+    private function deductAddonStockForTiket(int $idTiket): void
+    {
+        DB::transaction(function () use ($idTiket) {
+            $tiket = Tiket::where('ID_TIKET', $idTiket)->lockForUpdate()->first();
+            if (!$tiket) return;
+
+            if ((int) ($tiket->ADDON_STOK_DEDUCTED ?? 0) === 1) return;
+
+            $addons = BarangKamping::where('ID_TIKET', $idTiket)->get();
+            if ($addons->isEmpty()) {
+                $tiket->ADDON_STOK_DEDUCTED = 1;
+                $tiket->save();
+                return;
+            }
+
+            $ids = $addons->pluck('ID_FASILITAS')
+                ->filter(fn($v) => (int) $v > 0)
+                ->unique()
+                ->values()
+                ->all();
+
+            $locked = [];
+            if (count($ids) > 0) {
+                $locked = Fasilitas::whereIn('ID_FASILITAS', $ids)
+                    ->where('STATUS', 'AKTIF')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('ID_FASILITAS')
+                    ->all();
+            }
+
+            // validasi stok dulu
+            foreach ($addons as $ad) {
+                $qty = (int) ($ad->QTY ?? 0);
+                if ($qty <= 0) continue;
+
+                $fid = (int) ($ad->ID_FASILITAS ?? 0);
+
+                // fallback data lama: match by name
+                if ($fid <= 0) {
+                    $byName = Fasilitas::where('NAMA_FASILITAS', (string) $ad->NAMA_BARANG)
+                        ->where('STATUS', 'AKTIF')
+                        ->lockForUpdate()
+                        ->first();
+                    if ($byName) {
+                        $fid = (int) $byName->ID_FASILITAS;
+                        $locked[$fid] = $byName;
+                    }
+                }
+
+                if ($fid <= 0 || !isset($locked[$fid])) {
+                    throw new \Exception("Addon tidak valid / fasilitas sudah tidak tersedia.");
+                }
+
+                $stok = (int) ($locked[$fid]->STOK ?? 0);
+                if ($stok < $qty) {
+                    throw new \Exception("Stok {$locked[$fid]->NAMA_FASILITAS} tidak cukup. Sisa: {$stok}");
+                }
+            }
+
+            // potong stok
+            foreach ($addons as $ad) {
+                $qty = (int) ($ad->QTY ?? 0);
+                if ($qty <= 0) continue;
+
+                $fid = (int) ($ad->ID_FASILITAS ?? 0);
+
+                if ($fid <= 0) {
+                    $byName = Fasilitas::where('NAMA_FASILITAS', (string) $ad->NAMA_BARANG)
+                        ->where('STATUS', 'AKTIF')
+                        ->lockForUpdate()
+                        ->first();
+                    if ($byName) {
+                        $fid = (int) $byName->ID_FASILITAS;
+                        $locked[$fid] = $byName;
+                    }
+                }
+
+                if ($fid <= 0) continue;
+
+                $affected = Fasilitas::where('ID_FASILITAS', $fid)
+                    ->where('STOK', '>=', $qty)
+                    ->update(['STOK' => DB::raw("STOK - {$qty}")]);
+
+                if ($affected === 0) {
+                    throw new \Exception("Gagal potong stok fasilitas (stok berubah).");
+                }
+            }
+
+            $tiket->ADDON_STOK_DEDUCTED = 1;
+            $tiket->save();
+        });
+    }
+
+
 
     public function createForBooking($idTiket)
     {
@@ -213,6 +316,16 @@ class PaymentController extends Controller
         $pay->STATUS_BAYAR = $statusBayar;
 
         if ($statusBayar === 'LUNAS') {
+            try {
+                $this->deductAddonStockForTiket((int) $pay->ID_TIKET);
+            } catch (\Throwable $e) {
+                // stok tidak cukup saat status LUNAS -> tandai gagal (admin bisa refund/manual)
+                $pay->STATUS_BAYAR = 'GAGAL';
+                $pay->MIDTRANS_RAW_NOTIFICATION = json_encode(['stock_error' => $e->getMessage(), 'raw' => $data['raw'] ?? null]);
+                $pay->save();
+                return response()->json(['ok' => false, 'message' => $e->getMessage()], 409);
+            }
+
             $pay->TANGGAL_PEMBAYARAN = now()->toDateString();
 
             // set tempat jadi BOOKED
@@ -293,6 +406,14 @@ class PaymentController extends Controller
 
         if ($data['result'] === 'success') {
             $pay->STATUS_BAYAR = 'LUNAS';
+            try {
+                $this->deductAddonStockForTiket((int) $pay->ID_TIKET);
+            } catch (\Throwable $e) {
+                $pay->STATUS_BAYAR = 'GAGAL';
+                $pay->MIDTRANS_RAW_NOTIFICATION = json_encode(['stock_error' => $e->getMessage(), 'raw' => $data]);
+                $pay->save();
+                return response('stock_error', 200);
+            }
             $pay->TANGGAL_PEMBAYARAN = now()->toDateString();
 
             $tempat = $pay->tiket->tempat;

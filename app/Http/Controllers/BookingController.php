@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\BarangKamping;
+use App\Models\Fasilitas;
 use App\Models\HasilTiket;
 use App\Models\Pembayaran;
 use App\Models\Tiket;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 class BookingController extends Controller
 {
@@ -24,16 +26,43 @@ class BookingController extends Controller
     {
         $user = Auth::guard('pengunjung')->user();
 
+        $blocking = $this->blockingBooking((int) $user->ID_PENGUNJUNG);
+
         $bookings = Tiket::with(['tempat', 'pembayaran'])
             ->where('ID_PENGUNJUNG', $user->ID_PENGUNJUNG)
             ->orderByDesc('ID_TIKET')
             ->get();
 
-        return view('booking.index', compact('bookings'));
+        return view('booking.index', compact('bookings', 'blocking'));
+    }
+
+    /**
+     * Cari booking yang masih "menggantung" (belum lunas).
+     * Aturan fitur: user tidak boleh buat booking baru sebelum bayar (LUNAS) atau cancel.
+     */
+    private function blockingBooking(int $idPengunjung): ?Tiket
+    {
+        return Tiket::with('pembayaran')
+            ->where('ID_PENGUNJUNG', $idPengunjung)
+            ->where(function ($q) {
+                $q->whereDoesntHave('pembayaran')
+                    ->orWhereHas('pembayaran', function ($qq) {
+                        $qq->where('STATUS_BAYAR', '!=', 'LUNAS');
+                    });
+            })
+            ->orderByDesc('ID_TIKET')
+            ->first();
     }
 
 public function create(Request $request)
 {
+    $user = Auth::guard('pengunjung')->user();
+    $blocking = $this->blockingBooking((int) $user->ID_PENGUNJUNG);
+    if ($blocking) {
+        return redirect('/booking/'.$blocking->ID_TIKET)
+            ->with('ok', 'Kamu masih punya booking yang belum LUNAS. Silakan bayar dulu atau cancel booking tersebut.');
+    }
+
     $tempatList = HasilTiket::orderBy('NAMA_TEMPAT')->get();
     $rentalItems = $this->rentalItems;
 
@@ -45,6 +74,12 @@ public function create(Request $request)
     public function store(Request $request)
     {
         $user = Auth::guard('pengunjung')->user();
+
+        $blocking = $this->blockingBooking((int) $user->ID_PENGUNJUNG);
+        if ($blocking) {
+            return redirect('/booking/'.$blocking->ID_TIKET)
+                ->with('ok', 'Kamu masih punya booking yang belum LUNAS. Silakan bayar dulu atau cancel booking tersebut.');
+        }
 
         $data = $request->validate([
             'ID_TEMPAT' => 'required|integer',
@@ -143,5 +178,80 @@ public function create(Request $request)
         $grandTotal = $totalTempat + $totalAddon;
 
         return view('booking.show', compact('tiket', 'nights', 'totalTempat', 'totalAddon', 'grandTotal'));
+    }
+
+    public function cancel($id)
+    {
+        $user = Auth::guard('pengunjung')->user();
+
+        $tiket = Tiket::with(['pembayaran', 'addons'])
+            ->where('ID_TIKET', $id)
+            ->where('ID_PENGUNJUNG', $user->ID_PENGUNJUNG)
+            ->firstOrFail();
+
+        $statusBayar = $tiket->pembayaran->STATUS_BAYAR ?? null;
+        if ($statusBayar === 'LUNAS') {
+            return back()->with('ok', 'Booking sudah LUNAS, tidak bisa dibatalkan.');
+        }
+
+        DB::transaction(function () use ($tiket) {
+            // restore stok fasilitas (hanya jika sebelumnya sudah dipotong saat LUNAS)
+            if ((int)($tiket->ADDON_STOK_DEDUCTED ?? 0) === 1) {
+                // restore stok fasilitas (jika addon berasal dari master fasilitas)
+            // aman dari race-condition: lock row fasilitas dulu.
+            $addons = $tiket->addons;
+
+            $ids = $addons
+                ->pluck('ID_FASILITAS')
+                ->filter(fn($x) => !empty($x))
+                ->map(fn($x) => (int) $x)
+                ->unique()
+                ->values()
+                ->all();
+
+            $locked = collect();
+            if (count($ids) > 0) {
+                $locked = Fasilitas::whereIn('ID_FASILITAS', $ids)
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('ID_FASILITAS');
+            }
+
+            foreach ($addons as $ad) {
+                $qty = (int)($ad->QTY ?? 0);
+                if ($qty <= 0) continue;
+
+                $fid = (int)($ad->ID_FASILITAS ?? 0);
+
+                // fallback untuk data lama: match by name
+                if ($fid <= 0) {
+                    $byName = Fasilitas::where('NAMA_FASILITAS', (string) $ad->NAMA_BARANG)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($byName) {
+                        $fid = (int) $byName->ID_FASILITAS;
+                        $locked[$fid] = $byName;
+                    }
+                }
+
+                if ($fid > 0 && isset($locked[$fid])) {
+                    Fasilitas::where('ID_FASILITAS', $fid)
+                        ->update(['STOK' => DB::raw("STOK + {$qty}")]);
+                }
+            }
+
+            }
+
+            // hapus addons
+            $tiket->addons()->delete();
+            // hapus pembayaran (kalau ada)
+            if ($tiket->pembayaran) {
+                $tiket->pembayaran()->delete();
+            }
+            // hapus tiket
+            $tiket->delete();
+        });
+
+        return redirect('/booking')->with('ok', 'Booking berhasil dicancel. Kamu bisa buat booking baru.');
     }
 }
